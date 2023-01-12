@@ -442,12 +442,14 @@ async function ConnectButton() {
   try {
     log_line('Requesting Bluetooth Device...');
     device = await navigator.bluetooth.requestDevice({
-		filters: [
-			{services: [deviceServiceUUID]},
-			{services: [cmd_ServiceUUID]}
-		]
-
-	});
+        //acceptAllDevices:true
+        filters: [{
+            //{services: ["3eb78376-422c-4b34-a6f0-a0c826388b11"]},
+            //{services: ["f746fbd8-00a1-4b73-a78e-c6930248d9d2"]}
+            name: 'MIMES',
+            optionalServices: ['3eb78376-422c-4b34-a6f0-a0c826388b11']
+        }]
+    });
 
     log_line('Connecting to GATT Server...');
 	device.addEventListener('gattserverdisconnected', onDisconnected);
