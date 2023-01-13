@@ -39,7 +39,7 @@ I'm using async promises, which I find most straight forward to program with.
 
 DeviceName (Change this accordingly:):
 
-<input type="text" id="deviceName" value="MIMES">
+<input type="text" id="deviceName" value="bluenrg">
 <BR><BR>
 	<button class="button" onclick="ConnectButton()">Connect</button>
 	<button class="button" onclick="StatusButton()">Status</button>
@@ -95,7 +95,7 @@ function parse_url(){
 	log_line(value);
 	if (null == value) {
 		log_line("Setting default");
-		value = "MIMES";
+		value = "bluenrg";
 	}
 	document.querySelector('#deviceName').value = value;
 }
@@ -430,11 +430,22 @@ async function ConnectButton() {
         //acceptAllDevices:true
         filters: [
             //{services: ["3eb78376-422c-4b34-a6f0-a0c826388b11"]},
-            //{services: ["f746fbd8-00a1-4b73-a78e-c6930248d9d2"]}
+            //{services: ["f746fbd8-00a1-4b73-a78e-c6930248d9d2"]},
+            //{services: ["00001800-0000-1000-8000-00805f9b34fb"]},
+            //{services: ["00001801-0000-1000-8000-00805f9b34fb"]},
+            //{services: ["46039343-5555-4763-bbe6-27f4090900fa"]},
             {name: device_name}
         ],
-        optionalServices: ['46039343-5555-4763-bbe6-27f4090900fa']
+       optionalServices: [
+          // "device_information"
+          //"00001800-0000-1000-8000-00805f9b34fb"//,
+          //"00001801-0000-1000-8000-00805f9b34fb",
+          "46039343-5555-4763-bbe6-27f4090900fa"//, // from nRF app
+          //"3eb78376-422c-4b34-a6f0-a0c826388b11",
+          //"f746fbd8-00a1-4b73-a78e-c6930248d9d2"
+       ]
 	});
+    log_line('Got device:' + device.name + ' (' + device.id +')');
 
     log_line('Connecting to GATT Server...');
 	device.addEventListener('gattserverdisconnected', onDisconnected);
