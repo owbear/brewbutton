@@ -37,10 +37,9 @@ Reason of implementing it using Web Bluetooth, was that I needed to learn it.
 I'm using async promises, which I find most straight forward to program with.
 </p>
 
-AuthKey (Change this accordingly:):
+DeviceName (Change this accordingly:):
 
-<!-- AuthKey is default to MY machine, change accordingly -->
-<input type="text" id="authKey" value="">
+<input type="text" id="deviceName" value="MIMES">
 <BR><BR>
 	<button class="button" onclick="ConnectButton()">Connect</button>
 	<button class="button" onclick="StatusButton()">Status</button>
@@ -92,13 +91,13 @@ var nespressoDeviceAuth  = new Uint8Array(8);
 function parse_url(){
 	var urlParams = new URLSearchParams(window.location.search);
 //	log_line(urlParams);
-	var value = urlParams.get('authKey');
+	var value = urlParams.get('deviceName');
 	log_line(value);
 	if (null == value) {
 		log_line("Setting default");
-		value = "1234567812345678";
+		value = "MIMES";
 	}
-	document.querySelector('#authKey').value = value;
+	document.querySelector('#deviceName').value = value;
 }
 parse_url();
 var log_element = document.getElementById('log');
@@ -251,21 +250,6 @@ function hex2a(hexx) {
     for (var i = 0; i < hex.length; i += 2)
         str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
     return str;
-}
-
-// Hardcoded to 8 bytes (16 char)
-function SetAuthKey(str) {
-	if ( str.length != 16 ) {
-		log_line("AuthKey Error\n");
-		return;
-	}
-	tmp = "AuthKey :";
-	for (var i = 0; i < 8; i++ ) {
-		nespressoDeviceAuth[i] = parseInt(str.substr(i*2, 2), 16);
-		tmp = tmp  + " " + nespressoDeviceAuth[i].toString(16);
-	}
-	log_line(tmp);
-//	return buffer;
 }
 
 // Expects a dataview...
@@ -429,7 +413,7 @@ async function ConnectButton() {
 	// Clear log
 	log_clear();
 
-	SetAuthKey( document.querySelector('#authKey').value );
+	let device_name = document.querySelector('#deviceName').value;
 
 	if (deviceServiceUUID.startsWith('0x')) {
 		deviceServiceUUID = parseInt(deviceServiceUUID);
@@ -442,19 +426,17 @@ async function ConnectButton() {
   try {
     log_line('Requesting Bluetooth Device...');
     device = await navigator.bluetooth.requestDevice({
-        acceptAllDevices:true,
-	optionalServices: ["3eb78376-422c-4b34-a6f0-a0c826388b11"]
-        //filters: [{
-        //    //{services: ["3eb78376-422c-4b34-a6f0-a0c826388b11"]},
-        //    //{services: ["f746fbd8-00a1-4b73-a78e-c6930248d9d2"]}
-        //    name: 'MIMES',
-        //    optionalServices: ['3eb78376-422c-4b34-a6f0-a0c826388b11']
-        //}]
-    });
+        //acceptAllDevices:true
+        filters: [{
+            //{services: ["3eb78376-422c-4b34-a6f0-a0c826388b11"]},
+            //{services: ["f746fbd8-00a1-4b73-a78e-c6930248d9d2"]}
+            name: device_name
+        }],
+        optionalServices: ['3eb78376-422c-4b34-a6f0-a0c826388b11']
+	});
 
     log_line('Connecting to GATT Server...');
 	device.addEventListener('gattserverdisconnected', onDisconnected);
-
     server = await device.gatt.connect();
 
     log_line('Getting Service...');
