@@ -24,7 +24,7 @@
    https://github.com/petergullberg/brewbutton
   ––>
   <!-- ToDo's:
-	* Change the methods, that we don't need to to reselect each time windows starts screensaver
+	* Change the methods, that we do not need to to reselect each time windows starts screensaver
 	* Make BLE handling and communication more robust
 	* Investigate all error codes
 	* should manage re-connect
@@ -227,7 +227,7 @@ async function BrewButton() {
 		await RemoteCharacteristicCommand.writeValue( perfectRecipeBrew );
 
 		// The status is not immediately retrieved...
-		// Tnis is a workaround, since I don't know how I could wait a little to check sutat
+		// Tnis is a workaround, since I do not know how I could wait a little to check sutat
 		//
 		resp = await RemoteCharacteristicResponseStatus.readValue();
 		resp = await RemoteCharacteristicResponseStatus.readValue();
@@ -348,7 +348,7 @@ function extended_parse_status(view) {
 				// no break;
 			case 7:
 				time_to_descale_needed = time_to_descale_needed | (view.getUint8(6) << 8);
-				// if counter is 0xFFFF, then don't present it.
+				// if counter is 0xFFFF, then do not present it.
 				if ( 0xFFFF != time_to_descale_needed ) {
 					log_line("- Countdown until descale is needed: " + time_to_descale_needed);
 				}
@@ -390,6 +390,7 @@ function DisplayCharInfo(characteristics) {
     log_line('> Writable Auxiliaries: ' +
       characteristic.properties.writableAuxiliaries);
 }
+
 async function StatusButton() {
   try {
 	if ( RemoteCharacteristicStatus.properties.read) {
@@ -432,7 +433,7 @@ async function ConnectButton() {
             //{services: ["f746fbd8-00a1-4b73-a78e-c6930248d9d2"]}
             {name: device_name}
         ],
-        optionalServices: ['3eb78376-422c-4b34-a6f0-a0c826388b11']
+        optionalServices: ['46039343-5555-4763-bbe6-27f4090900fa']
 	});
 
     log_line('Connecting to GATT Server...');
