@@ -48,7 +48,7 @@ DeviceName (Change this accordingly:):
 
 
 <BR><BR>
-<textarea id="status" rows="1" cols="70" disabled></textarea>
+<textarea id="status" rows="5" cols="70" disabled></textarea>
 <BR><BR>
 
 <textarea id="log" rows="15" cols="70" disabled></textarea><BR>
@@ -63,9 +63,10 @@ var auth_service;
 var cmd_service;
 var characteristics;
 
-var RemoteCharacteristicAuth;
+var RemoteCharacteristicWr;
+var RemoteCharacteristicRd;
+
 var RemoteCharacteristicCommand;
-var RemoteCharacteristicStatus;
 var RemoteCharacteristicResponseStatus;
 
 var deviceServiceUUID  = "06aa1910-f22a-11e3-9daa-0002a5d5c51b";
@@ -252,6 +253,13 @@ function hex2a(hexx) {
     return str;
 }
 
+function buf2hex(buffer) { // buffer is an ArrayBuffer
+  return [...new Uint8Array(buffer)]
+      .map(x => x.toString(16).padStart(2, '0'))
+      .join('');
+}
+
+
 // Expects a dataview...
 function parse_status(view) {
 	var tmp_str= "";
@@ -278,88 +286,7 @@ function parse_status(view) {
 }
 function extended_parse_status(view) {
 	log_line("-------------");
-	log_line("Extended status:");
-// +------+-----------+---------------------------------------------------+
-// | Byte |    Bit    | Description                                       |
-// +------+-----------+---------------------------------------------------+
-// |  B0  | x1xx xxxx | Always 1                                          |
-// |      | xxx1 xxx0 | Capsule mechanism jammed                          |
-// |      | xxxx x1xx | Descaling is needed                               |
-// |      | xxxx xxx1 | Water is empty                                    |
-// +------+-----------+---------------------------------------------------+
-	switch ( view.getUint8(0) & 0x11 ) {
-		case 0x01:						 // Water empty
-			log_line("- water empty");
-			break;
-		case 0x10:						// It seems that these correpsonds with water empty
-			log_line("- Capsule mechanism jammed");
-			break;
-		case 0x11:
-			log_line("- haven't seen this (water empty + capsule jammed)...");
-			break;
-	}
-	// Descaler checked further below
-
-
-// |  B1  | 1xxx xxxx | Capsule engaged                                   |
-// |      | x1xx xxxx | Tray open / tray sensor full. Dx when sensor trips|
-// |      | xxx1 xxxx | Tray sensor tripped during brewing?               |
-// |      | xxxx 1xxx | Sleeping                                          |
-// |      | xxxx x1xx | Water pump engaged                                |
-// |      | xxxx xx1x | Awake, ok                                         |
-// |      | xxxx xxx1 | Water temperature low / set while sleeping        |
-	if ( 0x84 == (view.getUint8(1) & 0x84) ) {	// capsule engage + water pump engaged
-		log_line("- brewing coffee");
-	}
-	if ( 0x04 == (view.getUint8(1) & 0x84) ) {	// water pump engaged
-		log_line("- water pump engaged");
-	}
-	if ( 0x40 & view.getUint8(1) ) {	// tray open
-		log_line("- Tray open/sensor full");
-	}
-	if ( 0x09 == (view.getUint8(1) & 0x09 ) ) {
-		log_line("- Device is sleeping");
-	}
-	if ( 0x01 == (view.getUint8(1) & 0x09 ) ) {
-		log_line("- Low water");
-	}
-	if ( 0x02 & view.getUint8(1) ) {
-		log_line("- Awake, ok");
-	}
-
-
-// +------+-----------+---------------------------------------------------+
-// |  B4  | xx.. .... | Appears to be an error counter. It's incremented  |
-// |      |           | each time an error occurs. 00h,40h,80h,d0h,00h    |
-// |      |           | Maybe used to detect error (notifications)        |
-	var last_error = view.getUint8(4) & 0xC0;
-	log_line("- Last error: " +  last_error.toString(16));
-
-	if ( 0x04 & view.getUint8(0) ) {	// tray open
-		log_line("- Descaling is needed");
-	}
-	else {
-		// Otherwise, check if descaler counter has started.
-		var time_to_descale_needed = 0;
-		log_line("- BLE block length:" + view.byteLength );
-		switch (view.byteLength ) {
-			case 8:
-				time_to_descale_needed = view.getUint8(7);
-				// no break;
-			case 7:
-				time_to_descale_needed = time_to_descale_needed | (view.getUint8(6) << 8);
-				// if counter is 0xFFFF, then do not present it.
-				if ( 0xFFFF != time_to_descale_needed ) {
-					log_line("- Countdown until descale is needed: " + time_to_descale_needed);
-				}
-				break;
-			default:
-				//Nope, we could not find descaler counter...
-				break;
-		}
-	}
-
-
+	log_line("Extended status:" + buf2hex(view.buffer));
 }
 
 
@@ -374,7 +301,7 @@ function handleStatusNotification(event) {
   extended_parse_status(view);
 }
 
-function DisplayCharInfo(characteristics) {
+function DisplayCharInfo(characteristic) {
 
     log_line('> Characteristic UUID:  ' + characteristic.uuid);
     log_line('> Broadcast:            ' + characteristic.properties.broadcast);
@@ -393,9 +320,9 @@ function DisplayCharInfo(characteristics) {
 
 async function StatusButton() {
   try {
-	if ( RemoteCharacteristicStatus.properties.read) {
+	if ( RemoteCharacteristicRd.properties.read) {
 		log_line('Reading status');
-		const view = await RemoteCharacteristicStatus.readValue();
+		const view = await RemoteCharacteristicRd.readValue();
 		parse_status(view);
 
 	}
@@ -429,20 +356,21 @@ async function ConnectButton() {
     device = await navigator.bluetooth.requestDevice({
         //acceptAllDevices:true
         filters: [
-            //{services: ["3eb78376-422c-4b34-a6f0-a0c826388b11"]},
-            //{services: ["f746fbd8-00a1-4b73-a78e-c6930248d9d2"]},
+            {services: ["3eb78376-422c-4b34-a6f0-a0c826388b11"]},
+            {services: ["f746fbd8-00a1-4b73-a78e-c6930248d9d2"]},
             //{services: ["00001800-0000-1000-8000-00805f9b34fb"]},
             //{services: ["00001801-0000-1000-8000-00805f9b34fb"]},
-            //{services: ["46039343-5555-4763-bbe6-27f4090900fa"]},
-            {name: device_name}
+            {services: ["46039343-5555-4763-bbe6-27f4090900fa"]},
+            //{name: device_name}
+            {namePrefix: device_name}
         ],
        optionalServices: [
           // "device_information"
-          //"00001800-0000-1000-8000-00805f9b34fb"//,
+          //"00001800-0000-1000-8000-00805f9b34fb",
           //"00001801-0000-1000-8000-00805f9b34fb",
-          "46039343-5555-4763-bbe6-27f4090900fa"//, // from nRF app
-          //"3eb78376-422c-4b34-a6f0-a0c826388b11",
-          //"f746fbd8-00a1-4b73-a78e-c6930248d9d2"
+          //"46039343-5555-4763-bbe6-27f4090900fa", // from nRF app
+          "3eb78376-422c-4b34-a6f0-a0c826388b11",
+          "f746fbd8-00a1-4b73-a78e-c6930248d9d2"
        ]
 	});
     log_line('Got device:' + device.name + ' (' + device.id +')');
@@ -452,31 +380,35 @@ async function ConnectButton() {
     server = await device.gatt.connect();
 
     log_line('Getting Service...');
-    auth_service = await server.getPrimaryService(auth_ServiceUUID);
-    cmd_service = await server.getPrimaryService(cmd_ServiceUUID);
+    service = await server.getPrimaryService("46039343-5555-4763-bbe6-27f4090900fa");
 
-    log_line('Getting Characteristic...');
-	RemoteCharacteristicAuth    = await auth_service.getCharacteristic(auth_CharUUID);
+	log_line('Getting WR Characteristic...');
+	RemoteCharacteristicWr    = await service.getCharacteristic("f746fbd8-00a1-4b73-a78e-c6930248d9d2");
+	//DisplayCharInfo(RemoteCharacteristicWr);
+	log_line('Getting RD Characteristic...');
+	RemoteCharacteristicRd    = await service.getCharacteristic("3eb78376-422c-4b34-a6f0-a0c826388b11");
+	//DisplayCharInfo(RemoteCharacteristicRd);
 
-    log_line("established auth characteristic?");
+	await RemoteCharacteristicRd.startNotifications();
+	log_line("Notifications started");
+    	RemoteCharacteristicRd.addEventListener('characteristicvaluechanged', handleStatusNotification);
+
+    log_line("established WR characteristic?");
 
 
-	if ( RemoteCharacteristicAuth.properties.write ) {
-		log_line('Writing Auth');
-		await RemoteCharacteristicAuth.writeValue(nespressoDeviceAuth);
+	if ( RemoteCharacteristicWr.properties.write ) {
+		log_line('Writing!');
+	    	var data0 = new Uint8Array([0x00, 0x41, 0x42, 0x43]);
+    		await RemoteCharacteristicWr.writeValue(data0);
+await new Promise(r => setTimeout(r, 100));
+	    	var data1 = new Uint8Array([0x00, 0x51, 0x52, 0x53]);
+    		await RemoteCharacteristicWr.writeValue(data1);
+await new Promise(r => setTimeout(r, 100));
+	    	var data2 = new Uint8Array([0x00, 0x61, 0x62, 0x63]);
+    		await RemoteCharacteristicWr.writeValue(data2);
 	}
-	log_line("authenticated");
+	log_line("success");
 
-
-	RemoteCharacteristicCommand = await cmd_service.getCharacteristic(cmd_CmdCharUUID);
-	RemoteCharacteristicStatus  = await cmd_service.getCharacteristic(cmd_CmdStatusCharUUID);
-	RemoteCharacteristicResponseStatus  = await cmd_service.getCharacteristic(cmd_RespStatusCharUUID);
-
-
-	await RemoteCharacteristicStatus.startNotifications();
-    log_line("Notifications started");
-    RemoteCharacteristicStatus.addEventListener('characteristicvaluechanged',
-        handleStatusNotification);
 
 	StatusButton();
 	log_line("Connected\n")
@@ -490,3 +422,4 @@ async function ConnectButton() {
 
 </body>
 </html>
+
