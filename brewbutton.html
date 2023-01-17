@@ -112,8 +112,10 @@ function log_clear() {
 	log.scrollTop = log.scrollHeight;
 }
 
+var status_element = document.getElementById('status');
 function status_line(str){
-  document.getElementById("status").innerHTML = str;
+  status_element.value += str + "\n";
+  status_element.scrollTop = status_element.scrollHeight;
 }
 
 function status_clear() {
@@ -125,132 +127,26 @@ function ClearButton() {
   status_clear();
 }
 
-// Returns 0 in case of cmd error (0xCx) or unknown status
-// resp as a DataView object
-// sentCMd - the command, formatted as uint8array
-function check_respStatus( resp, sentCmd ) {
-	var rv = 1;
-
-	log_line(resp.getUint8(0).toString(16) + " " + resp.getUint8(1).toString(16));
-	//log_line(sentCmd);
-
-
-	if ( (sentCmd[0] == (resp.getUint8(0) & 0x3F)) &&
-	       (sentCmd[1] == resp.getUint8(1)) ) {
-		// CMD_RESP_STATUS corresponds to the actual sent command
-		var resp_code = 0;
-
-		// Extract response code
-		switch ( resp.getUint8(0) & 0xC0 ) {
-			case 0xC0:
-				rv = 0;
-				log_line('error');
-				break;
-			case 0x80:
-				log_line('ok');
-				break;
-			default:
-				rv = 0;
-				log_line('unknown status');
-				break;
-		}
-		// Extract response code, either 1B or 2B response
-		switch ( resp.getUint8(2) ) {
-			case 1:
-				resp_code = resp.getUint8(3);
-				break;
-			case 2:
-				resp_code = (resp.getUint8(3)<<8) | (resp.getUint8(4));
-				break
-			default:
-				log_line('unknown command');
-		}
-		// Check response code (assuming they have same global meaning)
-		switch ( resp_code ) {
-			case 0x20:
-				// ok - no extra logging
-				break;
-			case 0x21:
-				log_line("Brew cancelled");
-				break;
-			case 0x2412:
-				log_line('No capsule inserted');
-				status_line("No capsule inserted");
-				break;
-			case 0x3603:
-				log_line("command error");
-				break;
-			default:
-				log_line("unknown error");
-				break;
-		}
-		log_line('status-code: ' + resp_code.toString(16));
-	}
-	else {
-		rv = 0;
-		log_line('wrong command');
-	}
-
-	return rv;
-}
-
-cancelBrew = new Uint8Array([ 0x03, 0x06, 0x01, 0x02]);
+cancelBrew = new Uint8Array([ 0x00, 0x06, 0x01, 0x02]);
 
 async function onCancel() {
 	log_line("Cancelling brew");
-	await RemoteCharacteristicCommand.writeValue( cancelBrew );
-	resp = await RemoteCharacteristicResponseStatus.readValue();
-	check_respStatus(resp, cancelBrew );
+	await RemoteCharacteristicWr.writeValue( cancelBrew );
 }
 
-// This contains the perfect brew (According to me)
-// If you want to understand or change these, please check README.md, which specifies these commands
-perfectRecipe     = new Uint8Array([ 0x01, 0x10, 0x08, 0x00, 0x00, 0x01, 0x00, 0x82, 0x00, 0x00,0x00]);
 // Sequence to execute the brew command
-perfectRecipeBrew = new Uint8Array([ 0x03, 0x05, 0x07, 0x04, 0x00, 0x00, 0x00, 0x00, 0x02, 0x07 ]);
+perfectRecipeBrew = new Uint8Array([ 0x00, 0x05, 0x07, 0x04, 0x00, 0x00, 0x00, 0x00, 0x02, 0x07 ]);
+
 async function BrewButton() {
 
 	try {
 		log_line("===================");
-		log_line("Brewing coffee");
-
-		// I do not check whether the machine is ready to brew!
-		// should check: lid-cycling, engaged, other blocking error
-		// Out of water should probably not be checked, since the machine does not
-		// detect when user have added water
-
-		await RemoteCharacteristicCommand.writeValue( perfectRecipe);
-		resp = await RemoteCharacteristicResponseStatus.readValue();
-		if ( !check_respStatus(resp, perfectRecipe ) ) {
-			return;
-		}
-
-		await RemoteCharacteristicCommand.writeValue( perfectRecipeBrew );
-
-		// The status is not immediately retrieved...
-		// Tnis is a workaround, since I do not know how I could wait a little to check sutat
-		//
-		resp = await RemoteCharacteristicResponseStatus.readValue();
-		resp = await RemoteCharacteristicResponseStatus.readValue();
-		resp = await RemoteCharacteristicResponseStatus.readValue();
-		resp = await RemoteCharacteristicResponseStatus.readValue();
-		if ( !check_respStatus(resp, perfectRecipeBrew ) ) {
-			return;
-		}
-
-
-		log_line("Your perfect brew is about to be delivered");
+		log_line("Sending");
+		await RemoteCharacteristicWr.writeValue( perfectRecipeBrew );
+		log_line("sent");
 	} catch(error) {
 		log_line('Argh! ' + error);
 	}
-}
-
-function hex2a(hexx) {
-    var hex = hexx.toString();//force conversion
-    var str = '';
-    for (var i = 0; i < hex.length; i += 2)
-        str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
-    return str;
 }
 
 function buf2hex(buffer) { // buffer is an ArrayBuffer
@@ -273,14 +169,6 @@ function parse_status(view) {
 		tmp_str += " ";
 	}
 	val_buf = "Status: hex(" + tmp_str + ") : ";
-	if ( view.getUint8(0) & 0x01 ) // Water empty
-		val_buf += "no water ";
-	if ( 0x84 == (view.getUint8(1) & 0x84) ) // capsule engage
-		val_buf += "coffe! ";
-	if ( 0x04 == (view.getUint8(1) & 0x84) )
-		val_buf += "water ";
-	if ( 0x02 == view.getUint8(1) )
-		val_buf += "idle";
 
 	status_line(val_buf);
 }
@@ -290,18 +178,18 @@ function extended_parse_status(view) {
 }
 
 
-function onDisconnected(event) {
-  document.getElementById("log").innerHTML = "";
-  status_line("Disconnected");
-}
-
 function handleStatusNotification(event) {
   let view = event.target.value;
   parse_status(view);
   extended_parse_status(view);
 }
 
-function DisplayCharInfo(characteristic) {
+function onDisconnected(event) {
+  document.getElementById("log").innerHTML = "";
+  status_line("Disconnected");
+}
+
+function DisplayCharInfo(characteristic) { // unused utility
 
     log_line('> Characteristic UUID:  ' + characteristic.uuid);
     log_line('> Broadcast:            ' + characteristic.properties.broadcast);
@@ -356,11 +244,11 @@ async function ConnectButton() {
     device = await navigator.bluetooth.requestDevice({
         //acceptAllDevices:true
         filters: [
-            {services: ["3eb78376-422c-4b34-a6f0-a0c826388b11"]},
-            {services: ["f746fbd8-00a1-4b73-a78e-c6930248d9d2"]},
+            //{services: ["3eb78376-422c-4b34-a6f0-a0c826388b11"]},
+            //{services: ["f746fbd8-00a1-4b73-a78e-c6930248d9d2"]},
             //{services: ["00001800-0000-1000-8000-00805f9b34fb"]},
             //{services: ["00001801-0000-1000-8000-00805f9b34fb"]},
-            {services: ["46039343-5555-4763-bbe6-27f4090900fa"]},
+            //{services: ["46039343-5555-4763-bbe6-27f4090900fa"]},
             //{name: device_name}
             {namePrefix: device_name}
         ],
@@ -368,9 +256,9 @@ async function ConnectButton() {
           // "device_information"
           //"00001800-0000-1000-8000-00805f9b34fb",
           //"00001801-0000-1000-8000-00805f9b34fb",
-          //"46039343-5555-4763-bbe6-27f4090900fa", // from nRF app
-          "3eb78376-422c-4b34-a6f0-a0c826388b11",
-          "f746fbd8-00a1-4b73-a78e-c6930248d9d2"
+          "46039343-5555-4763-bbe6-27f4090900fa"//, // from nRF app
+          //"3eb78376-422c-4b34-a6f0-a0c826388b11",
+          //"f746fbd8-00a1-4b73-a78e-c6930248d9d2"
        ]
 	});
     log_line('Got device:' + device.name + ' (' + device.id +')');
@@ -379,11 +267,11 @@ async function ConnectButton() {
 	device.addEventListener('gattserverdisconnected', onDisconnected);
     server = await device.gatt.connect();
 
-    log_line('Getting Service...');
+    log_line('Getting Primary Service...');
     service = await server.getPrimaryService("46039343-5555-4763-bbe6-27f4090900fa");
 
 	log_line('Getting WR Characteristic...');
-	RemoteCharacteristicWr    = await service.getCharacteristic("f746fbd8-00a1-4b73-a78e-c6930248d9d2");
+	RemoteCharacteristicWr  = await service.getCharacteristic("f746fbd8-00a1-4b73-a78e-c6930248d9d2");
 	//DisplayCharInfo(RemoteCharacteristicWr);
 	log_line('Getting RD Characteristic...');
 	RemoteCharacteristicRd    = await service.getCharacteristic("3eb78376-422c-4b34-a6f0-a0c826388b11");
