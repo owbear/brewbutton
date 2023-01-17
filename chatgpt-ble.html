@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script>
+    const UUID_primary = "46039343-5555-4763-bbe6-27f4090900fa";
+    const UUID_tx = "f746fbd8-00a1-4b73-a78e-c6930248d9d2";
+    const UUID_rx = "3eb78376-422c-4b34-a6f0-a0c826388b11";
+    var device;
+
+    // Function to connect to the device
+    async function connect() {
+      try {
+        // Request a device with the UART service
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{services: [UUID_primary]}]
+        });
+
+        // Connect to the device
+        const server = await device.gatt.connect();
+
+        // Get the UART service
+        const service = await server.getPrimaryService(UUID_primary);
+
+        // Get the RX and TX characteristics
+        const rx = await service.getCharacteristic(UUID_rx);
+        const tx = await service.getCharacteristic(UUID_tx);
+
+        // Enable notifications on the RX characteristic
+        await rx.startNotifications();
+
+        // Listen for messages from the device
+        rx.addEventListener('characteristicvaluechanged', handleMessage);
+
+        // Send a message to the device
+        await tx.writeValue(new TextEncoder().encode("\0Hello!"));
+      } catch (error) {
+        console.log('Argh! ' + error);
+      }
+    }
+
+    // Function to handle incoming messages
+    function handleMessage(event) {
+      const value = new TextDecoder().decode(event.target.value);
+      console.log("Received message: " + value);
+    }
+  </script>
+</head>
+<body>
+  <button onclick="connect()">Connect</button>
+</body>
+</html>

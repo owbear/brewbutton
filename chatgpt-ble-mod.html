@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+		<style>
+		.button {
+		  background-color: #4CAF50;
+		  border: none;
+		  color: white;
+		  padding: 15px 32px;
+		  text-align: center;
+		  text-decoration: none;
+		  display: inline-block;
+		  font-size: 16px;
+		  margin: 4px 2px;
+		  cursor: pointer;
+		}
+		</style>
+</head>
+<body>
+  <button onclick="connect()">Connect</button>
+  <button onclick="sendMessage()">Send</button>
+  <button onclick="disconnect()">Disconnect</button>
+  <textarea id="status" rows="5" cols="70" disabled></textarea>
+
+  <script>
+    const UUID_primary = "46039343-5555-4763-bbe6-27f4090900fa";
+    const UUID_tx = "f746fbd8-00a1-4b73-a78e-c6930248d9d2";
+    const UUID_rx = "3eb78376-422c-4b34-a6f0-a0c826388b11";
+    const status_element = document.getElementById('status');
+    var device;
+    var char_tx;
+
+    // Function to connect to the device
+    async function connect() {
+      try {
+        // Request a device with the UART service
+        device = await navigator.bluetooth.requestDevice({
+          filters: [
+              {services: [UUID_primary]},
+              {namePrefix: 'b'}
+          ]
+        });
+
+        console.log('Connect to the device');
+        const server = await device.gatt.connect();
+
+        console.log('Get the primary service');
+        const service = await server.getPrimaryService(UUID_primary);
+
+        // Get the RX and TX characteristics
+        console.log('getCharacteristic rx');
+        const char_rx = await service.getCharacteristic(UUID_rx);
+        console.log('getCharacteristic tx');
+        char_tx = await service.getCharacteristic(UUID_tx);
+
+        console.log('Enable notifications on the RX characteristic');
+        await char_rx.startNotifications();
+
+        // Listen for messages from the device
+        console.log('addEventListener');
+        char_rx.addEventListener('characteristicvaluechanged', handleMessage);
+      } catch (error) {
+        console.log('Argh! ' + error);
+      }
+    }
+
+    function status_line(str){
+      status_element.value += str + "\n";
+      status_element.scrollTop = status_element.scrollHeight;
+    }
+
+    // Function to handle incoming messages
+    function handleMessage(event) {
+        const value = new TextDecoder().decode(event.target.value);
+        status_line("in[" + value + "]");
+        console.log("Received message: " + value);
+    }
+
+    async function sendMessage() {
+        console.log("Sending a message");
+        status_line("Sending a message");
+        await char_tx.writeValue(new TextEncoder().encode("\0Hello!"));
+    }
+
+    async function disconnect() {
+        console.log("Disconnecting");
+        await device.gatt.disconnect();
+    }
+
+
+    async function checkInput(event) {
+        var keyCode = event.hasOwnProperty('which') ? event.which : event.keyCode;
+        console.log('keypress ' + keyCode);
+        await char_tx.writeValue(new Uint8Array([0, keyCode]));
+    }
+
+    //document.getElementById("status").addEventListener("keypress", checkInput)
+    document.addEventListener("keypress", checkInput)
+
+  </script>
+</body>
+</html>
