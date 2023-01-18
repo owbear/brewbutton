@@ -17,6 +17,7 @@
 		</style>
 </head>
 <body>
+  <button onclick="select()">Select</button>
   <button onclick="connect()">Connect</button>
   <button onclick="sendMessage()">Send</button>
   <button onclick="disconnect()">Disconnect</button>
@@ -30,16 +31,24 @@
     var device;
     var char_tx;
 
-    // Function to connect to the device
-    async function connect() {
+    async function select() {
       try {
-        // Request a device with the UART service
+        console.log('Request a device');
         device = await navigator.bluetooth.requestDevice({
           filters: [
               {services: [UUID_primary]},
               {namePrefix: 'b'}
           ]
         });
+        device.addEventListener('gattserverdisconnected', onDisconnected);
+        console.log('Request successful');
+      } catch (error) {
+        console.log('Argh! ' + error);
+      }
+    }
+
+    async function connect() {
+      try {
 
         console.log('Connect to the device');
         const server = await device.gatt.connect();
@@ -47,7 +56,6 @@
         console.log('Get the primary service');
         const service = await server.getPrimaryService(UUID_primary);
 
-        // Get the RX and TX characteristics
         console.log('getCharacteristic rx');
         const char_rx = await service.getCharacteristic(UUID_rx);
         console.log('getCharacteristic tx');
@@ -56,9 +64,9 @@
         console.log('Enable notifications on the RX characteristic');
         await char_rx.startNotifications();
 
-        // Listen for messages from the device
         console.log('addEventListener');
         char_rx.addEventListener('characteristicvaluechanged', handleMessage);
+        console.log('Connect successful');
       } catch (error) {
         console.log('Argh! ' + error);
       }
@@ -69,7 +77,10 @@
       status_element.scrollTop = status_element.scrollHeight;
     }
 
-    // Function to handle incoming messages
+    function onDisconnected(event) {
+        status_line("Disconnected");
+    }
+
     function handleMessage(event) {
         const value = new TextDecoder().decode(event.target.value);
         status_line("in[" + value + "]");
@@ -91,7 +102,11 @@
     async function checkInput(event) {
         var keyCode = event.hasOwnProperty('which') ? event.which : event.keyCode;
         console.log('keypress ' + keyCode);
-        await char_tx.writeValue(new Uint8Array([0, keyCode]));
+        try {
+            await char_tx.writeValue(new Uint8Array([0, keyCode]));
+        } catch (error) {
+            console.log('Argh! ' + error);
+        }
     }
 
     //document.getElementById("status").addEventListener("keypress", checkInput)
