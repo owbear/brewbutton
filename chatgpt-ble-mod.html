@@ -17,10 +17,13 @@
 		</style>
 </head>
 <body>
+  <input type="text" id="deviceNamePrefix" value="MIMES">
+  <BR><BR>
   <button onclick="select()">Select</button>
   <button onclick="connect()">Connect</button>
   <button onclick="sendMessage()">Send</button>
   <button onclick="disconnect()">Disconnect</button>
+  <BR>
   <textarea id="status" rows="5" cols="70" disabled></textarea>
 
   <script>
@@ -37,11 +40,11 @@
         device = await navigator.bluetooth.requestDevice({
           filters: [
               {services: [UUID_primary]},
-              {namePrefix: 'b'}
+              {namePrefix: document.querySelector('#deviceNamePrefix').value}
           ]
         });
         device.addEventListener('gattserverdisconnected', onDisconnected);
-        console.log('Request successful');
+        console.log('Got device: ' + device.name + ' (' + device.id +')');
       } catch (error) {
         console.log('Argh! ' + error);
       }
@@ -68,7 +71,12 @@
         char_rx.addEventListener('characteristicvaluechanged', handleMessage);
         console.log('Connect successful');
       } catch (error) {
-        console.log('Argh! ' + error);
+          console.log('Argh! ' + error);
+          try {
+              await device.gatt.disconnect(); }
+          catch (error) {
+              console.log('Argh!Argh!! ' + error); 
+          }
       }
     }
 
