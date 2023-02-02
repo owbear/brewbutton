@@ -19,6 +19,12 @@
 <body>
   <input type="text" id="deviceNamePrefix" value="MIMES">
   <BR><BR>
+  <label for="profisafe_device_address">PSD device address</label>
+  <input type="number" id="profisafe.device_address" min="1" max="65534">
+  <label for="profisafe_watchdog">PSD watchdog</label>
+  <input type="number" id="profisafe.watchdog" min="1" max="65535">
+  <button onclick="profisafe_send(document.getElementById('profisafe.device_address').valueAsNumber,document.getElementById('profisafe.watchdog').valueAsNumber)">Provision</button>
+  <BR><BR>
   <button onclick="select()">Select</button>
   <button onclick="connect()">Connect</button>
   <button onclick="sendMessage()">Send</button>

@@ -1,9 +1,11 @@
 const UUID_primary = "46039343-5555-4763-bbe6-27f4090900fa";
 const UUID_tx = "f746fbd8-00a1-4b73-a78e-c6930248d9d2";
 const UUID_rx = "3eb78376-422c-4b34-a6f0-a0c826388b11";
+const UUID_fpars = "f846fbd8-00a1-4b73-a78e-c6930248d9d2";
 const status_element = document.getElementById('status');
 var device;
 var char_tx;
+var char_fpars;
 
 async function select() {
   try {
@@ -34,6 +36,7 @@ async function connect() {
     const char_rx = await service.getCharacteristic(UUID_rx);
     console.log('getCharacteristic tx');
     char_tx = await service.getCharacteristic(UUID_tx);
+    char_fpars = await service.getCharacteristic(UUID_fpars);
 
     console.log('addEventListener');
     char_rx.addEventListener('characteristicvaluechanged', handleMessage);
@@ -73,12 +76,14 @@ async function sendMessage() {
 }
 
 async function disconnect() {
+    if (!device?.gatt?.connected) { return; }
     console.log("Disconnecting");
     await device.gatt.disconnect();
 }
 
 
 async function checkInput(event) {
+    if (!device?.gatt?.connected) { return; }
     var keyCode = event.hasOwnProperty('which') ? event.which : event.keyCode;
     console.log('keypress ' + keyCode);
     try {
@@ -90,3 +95,15 @@ async function checkInput(event) {
 
 //document.getElementById("status").addEventListener("keypress", checkInput)
 document.addEventListener("keypress", checkInput)
+
+async function profisafe_send(device_address, watchdog) {
+    status_line(`Sending fparam address ${device_address} and watchdog ${watchdog}`)
+
+    bytes = new ArrayBuffer(4);
+    view = new DataView(bytes);
+    view.setUint16(0, device_address, false); // byteOffset = 0; litteEndian = false
+    view.setUint16(2, watchdog, false); // byteOffset = 0; litteEndian = false
+    status_line('Would send [' + bytes + ']');
+
+    await char_fpars.writeValue(bytes);
+}
