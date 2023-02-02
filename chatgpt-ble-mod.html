@@ -64,14 +64,15 @@
         console.log('getCharacteristic tx');
         char_tx = await service.getCharacteristic(UUID_tx);
 
+        console.log('addEventListener');
+        char_rx.addEventListener('characteristicvaluechanged', handleMessage);
+
         console.log('Enable notifications on the RX characteristic');
         await char_rx.startNotifications();
 
-        console.log('addEventListener');
-        char_rx.addEventListener('characteristicvaluechanged', handleMessage);
-        console.log('Connect successful');
+        status_line('Connected');
       } catch (error) {
-          console.log('Argh! ' + error);
+          status_line('Argh! ' + error);
           try {
               await device.gatt.disconnect(); }
           catch (error) {
@@ -97,7 +98,6 @@
 
     async function sendMessage() {
         console.log("Sending a message");
-        status_line("Sending a message");
         await char_tx.writeValue(new TextEncoder().encode("\0Hello!"));
     }
 
