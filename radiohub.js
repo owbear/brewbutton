@@ -18,6 +18,7 @@ async function select() {
     });
     device.addEventListener('gattserverdisconnected', onDisconnected);
     console.log('Got device: ' + device.name + ' (' + device.id +')');
+    connect();
   } catch (error) {
     console.log('Argh! ' + error);
   }
@@ -45,6 +46,7 @@ async function connect() {
     await char_rx.startNotifications();
 
     status_line('Connected');
+    wereConnected(true)
   } catch (error) {
       status_line('Argh! ' + error);
       try {
@@ -62,6 +64,14 @@ function status_line(str){
 
 function onDisconnected(event) {
     status_line("Disconnected");
+    wereConnected(false)
+}
+
+function wereConnected(state)
+{
+    for (let e of document.getElementsByClassName("input")) {
+        e.disabled = !state;
+    }
 }
 
 function handleMessage(event) {
@@ -70,31 +80,11 @@ function handleMessage(event) {
     console.log("Received message: " + value);
 }
 
-async function sendMessage() {
-    console.log("Sending a message");
-    await char_tx.writeValue(new TextEncoder().encode("\0Hello!"));
-}
-
 async function disconnect() {
     if (!device?.gatt?.connected) { return; }
     console.log("Disconnecting");
     await device.gatt.disconnect();
 }
-
-
-async function checkInput(event) {
-    if (!device?.gatt?.connected) { return; }
-    var keyCode = event.hasOwnProperty('which') ? event.which : event.keyCode;
-    console.log('keypress ' + keyCode);
-    try {
-        await char_tx.writeValue(new Uint8Array([0, keyCode]));
-    } catch (error) {
-        console.log('Argh! ' + error);
-    }
-}
-
-//document.getElementById("status").addEventListener("keypress", checkInput)
-document.addEventListener("keypress", checkInput)
 
 async function profisafe_send(device_address, watchdog) {
     status_line(`Sending fparam address ${device_address} and watchdog ${watchdog}`)
@@ -102,8 +92,6 @@ async function profisafe_send(device_address, watchdog) {
     bytes = new ArrayBuffer(4);
     view = new DataView(bytes);
     view.setUint16(0, device_address, false); // byteOffset = 0; litteEndian = false
-    view.setUint16(2, watchdog, false); // byteOffset = 0; litteEndian = false
-    status_line('Would send [' + bytes + ']');
-
+    view.setUint16(2, watchdog, false); // byteOffset = 2; litteEndian = false
     await char_fpars.writeValue(bytes);
 }

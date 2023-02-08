@@ -20,14 +20,13 @@
   <input type="text" id="deviceNamePrefix" value="MIMES">
   <BR><BR>
   <label for="profisafe_device_address">PSD device address</label>
-  <input type="number" id="profisafe.device_address" min="1" max="65534">
+  <input type="number" class="input" id="profisafe.device_address" min="1" max="65534" disabled>
   <label for="profisafe_watchdog">PSD watchdog</label>
-  <input type="number" id="profisafe.watchdog" min="1" max="65535">
+  <input type="number" class="input" id="profisafe.watchdog" min="1" max="65535" disabled>
   <button onclick="profisafe_send(document.getElementById('profisafe.device_address').valueAsNumber,document.getElementById('profisafe.watchdog').valueAsNumber)">Provision</button>
   <BR><BR>
   <button onclick="select()">Select</button>
-  <button onclick="connect()">Connect</button>
-  <button onclick="sendMessage()">Send</button>
+  <button onclick="connect()">Reconnect</button>
   <button onclick="disconnect()">Disconnect</button>
   <BR>
   <textarea id="status" rows="5" cols="70" disabled></textarea>
